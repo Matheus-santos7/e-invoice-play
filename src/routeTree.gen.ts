@@ -10,32 +10,176 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppRegrasRouteImport } from './routes/_app.regras'
+import { Route as AppProdutosRouteImport } from './routes/_app.produtos'
+import { Route as AppPedidosRouteImport } from './routes/_app.pedidos'
+import { Route as AppIaRouteImport } from './routes/_app.ia'
+import { Route as AppEventosRouteImport } from './routes/_app.eventos'
+import { Route as AppEmpresasRouteImport } from './routes/_app.empresas'
+import { Route as AppCteRouteImport } from './routes/_app.cte'
+import { Route as AppAuditoriaRouteImport } from './routes/_app.auditoria'
+import { Route as AppNfeIndexRouteImport } from './routes/_app.nfe.index'
+import { Route as AppNfeNovaRouteImport } from './routes/_app.nfe.nova'
+import { Route as AppNfeChaveRouteImport } from './routes/_app.nfe.$chave'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRegrasRoute = AppRegrasRouteImport.update({
+  id: '/regras',
+  path: '/regras',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProdutosRoute = AppProdutosRouteImport.update({
+  id: '/produtos',
+  path: '/produtos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPedidosRoute = AppPedidosRouteImport.update({
+  id: '/pedidos',
+  path: '/pedidos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppIaRoute = AppIaRouteImport.update({
+  id: '/ia',
+  path: '/ia',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEventosRoute = AppEventosRouteImport.update({
+  id: '/eventos',
+  path: '/eventos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEmpresasRoute = AppEmpresasRouteImport.update({
+  id: '/empresas',
+  path: '/empresas',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCteRoute = AppCteRouteImport.update({
+  id: '/cte',
+  path: '/cte',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAuditoriaRoute = AppAuditoriaRouteImport.update({
+  id: '/auditoria',
+  path: '/auditoria',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNfeIndexRoute = AppNfeIndexRouteImport.update({
+  id: '/nfe/',
+  path: '/nfe/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNfeNovaRoute = AppNfeNovaRouteImport.update({
+  id: '/nfe/nova',
+  path: '/nfe/nova',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNfeChaveRoute = AppNfeChaveRouteImport.update({
+  id: '/nfe/$chave',
+  path: '/nfe/$chave',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppRoute
+  '/': typeof AppIndexRoute
+  '/auditoria': typeof AppAuditoriaRoute
+  '/cte': typeof AppCteRoute
+  '/empresas': typeof AppEmpresasRoute
+  '/eventos': typeof AppEventosRoute
+  '/ia': typeof AppIaRoute
+  '/pedidos': typeof AppPedidosRoute
+  '/produtos': typeof AppProdutosRoute
+  '/regras': typeof AppRegrasRoute
+  '/nfe/$chave': typeof AppNfeChaveRoute
+  '/nfe/nova': typeof AppNfeNovaRoute
+  '/nfe/': typeof AppNfeIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof AppRoute
+  '/auditoria': typeof AppAuditoriaRoute
+  '/cte': typeof AppCteRoute
+  '/empresas': typeof AppEmpresasRoute
+  '/eventos': typeof AppEventosRoute
+  '/ia': typeof AppIaRoute
+  '/pedidos': typeof AppPedidosRoute
+  '/produtos': typeof AppProdutosRoute
+  '/regras': typeof AppRegrasRoute
+  '/': typeof AppIndexRoute
+  '/nfe/$chave': typeof AppNfeChaveRoute
+  '/nfe/nova': typeof AppNfeNovaRoute
+  '/nfe': typeof AppNfeIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/_app': typeof AppRoute
+  '/_app': typeof AppRouteWithChildren
+  '/_app/auditoria': typeof AppAuditoriaRoute
+  '/_app/cte': typeof AppCteRoute
+  '/_app/empresas': typeof AppEmpresasRoute
+  '/_app/eventos': typeof AppEventosRoute
+  '/_app/ia': typeof AppIaRoute
+  '/_app/pedidos': typeof AppPedidosRoute
+  '/_app/produtos': typeof AppProdutosRoute
+  '/_app/regras': typeof AppRegrasRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/nfe/$chave': typeof AppNfeChaveRoute
+  '/_app/nfe/nova': typeof AppNfeNovaRoute
+  '/_app/nfe/': typeof AppNfeIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auditoria'
+    | '/cte'
+    | '/empresas'
+    | '/eventos'
+    | '/ia'
+    | '/pedidos'
+    | '/produtos'
+    | '/regras'
+    | '/nfe/$chave'
+    | '/nfe/nova'
+    | '/nfe/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/_app'
+  to:
+    | '/auditoria'
+    | '/cte'
+    | '/empresas'
+    | '/eventos'
+    | '/ia'
+    | '/pedidos'
+    | '/produtos'
+    | '/regras'
+    | '/'
+    | '/nfe/$chave'
+    | '/nfe/nova'
+    | '/nfe'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/_app/auditoria'
+    | '/_app/cte'
+    | '/_app/empresas'
+    | '/_app/eventos'
+    | '/_app/ia'
+    | '/_app/pedidos'
+    | '/_app/produtos'
+    | '/_app/regras'
+    | '/_app/'
+    | '/_app/nfe/$chave'
+    | '/_app/nfe/nova'
+    | '/_app/nfe/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  AppRoute: typeof AppRoute
+  AppRoute: typeof AppRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -47,11 +191,127 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/': {
+      id: '/_app/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/regras': {
+      id: '/_app/regras'
+      path: '/regras'
+      fullPath: '/regras'
+      preLoaderRoute: typeof AppRegrasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/produtos': {
+      id: '/_app/produtos'
+      path: '/produtos'
+      fullPath: '/produtos'
+      preLoaderRoute: typeof AppProdutosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/pedidos': {
+      id: '/_app/pedidos'
+      path: '/pedidos'
+      fullPath: '/pedidos'
+      preLoaderRoute: typeof AppPedidosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/ia': {
+      id: '/_app/ia'
+      path: '/ia'
+      fullPath: '/ia'
+      preLoaderRoute: typeof AppIaRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/eventos': {
+      id: '/_app/eventos'
+      path: '/eventos'
+      fullPath: '/eventos'
+      preLoaderRoute: typeof AppEventosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/empresas': {
+      id: '/_app/empresas'
+      path: '/empresas'
+      fullPath: '/empresas'
+      preLoaderRoute: typeof AppEmpresasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/cte': {
+      id: '/_app/cte'
+      path: '/cte'
+      fullPath: '/cte'
+      preLoaderRoute: typeof AppCteRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/auditoria': {
+      id: '/_app/auditoria'
+      path: '/auditoria'
+      fullPath: '/auditoria'
+      preLoaderRoute: typeof AppAuditoriaRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/nfe/': {
+      id: '/_app/nfe/'
+      path: '/nfe'
+      fullPath: '/nfe/'
+      preLoaderRoute: typeof AppNfeIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/nfe/nova': {
+      id: '/_app/nfe/nova'
+      path: '/nfe/nova'
+      fullPath: '/nfe/nova'
+      preLoaderRoute: typeof AppNfeNovaRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/nfe/$chave': {
+      id: '/_app/nfe/$chave'
+      path: '/nfe/$chave'
+      fullPath: '/nfe/$chave'
+      preLoaderRoute: typeof AppNfeChaveRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppAuditoriaRoute: typeof AppAuditoriaRoute
+  AppCteRoute: typeof AppCteRoute
+  AppEmpresasRoute: typeof AppEmpresasRoute
+  AppEventosRoute: typeof AppEventosRoute
+  AppIaRoute: typeof AppIaRoute
+  AppPedidosRoute: typeof AppPedidosRoute
+  AppProdutosRoute: typeof AppProdutosRoute
+  AppRegrasRoute: typeof AppRegrasRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppNfeChaveRoute: typeof AppNfeChaveRoute
+  AppNfeNovaRoute: typeof AppNfeNovaRoute
+  AppNfeIndexRoute: typeof AppNfeIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAuditoriaRoute: AppAuditoriaRoute,
+  AppCteRoute: AppCteRoute,
+  AppEmpresasRoute: AppEmpresasRoute,
+  AppEventosRoute: AppEventosRoute,
+  AppIaRoute: AppIaRoute,
+  AppPedidosRoute: AppPedidosRoute,
+  AppProdutosRoute: AppProdutosRoute,
+  AppRegrasRoute: AppRegrasRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppNfeChaveRoute: AppNfeChaveRoute,
+  AppNfeNovaRoute: AppNfeNovaRoute,
+  AppNfeIndexRoute: AppNfeIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  AppRoute: AppRoute,
+  AppRoute: AppRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
