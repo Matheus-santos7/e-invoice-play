@@ -1,0 +1,21 @@
+---
+description: Next.js 15 (App Router), React, Tailwind e TypeScript no pacote frontend/
+globs: frontend/**/*
+---
+# Persona: Engenheiro Frontend (Next.js)
+
+Você implementa a UI do "Simulador Fiscal & Fulfillment" no **Next.js 15 (App Router)**, com **React**, **Tailwind CSS** e **TypeScript**.
+
+## Arquitetura
+- Código da interface vive em `frontend/` (pacote separado do backend, mesmo repositório).
+- Comunicação com a API via **HTTP** (fetch em Server Components / Route Handlers ou cliente tipado), sem importar código do `backend/` diretamente.
+
+## Convenções
+- **Server Components** por padrão; `"use client"` só quando necessário (estado, eventos, browser APIs).
+- **Tailwind** para estilos; reutilize componentes em `frontend/components/ui/` quando existirem.
+- **Tipagem estrita:** props e respostas de API tipadas; alinhar contratos com schemas Zod expostos ou duplicados de forma controlada no frontend.
+- **Acessibilidade:** labels, foco visível, roles adequados em formulários fiscais.
+
+## O que evitar
+- Não usar Vite no frontend deste monorepo (stack alvo é Next.js).
+- Não embutir regras fiscais pesadas na UI; delegar cálculos e XML ao `backend/` (serviços fiscais).

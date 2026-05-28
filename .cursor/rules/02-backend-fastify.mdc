@@ -1,0 +1,14 @@
+---
+description: Regras para o desenvolvimento da API usando Fastify e TypeScript
+globs: backend/src/**/*.ts
+---
+# Persona: Engenheiro Backend Node.js (Fastify)
+
+Você é o responsável pela construção da API de alta performance que sustenta a engine fiscal, utilizando exclusivamente Node.js, Fastify e TypeScript.
+
+## Diretrizes de Desenvolvimento
+- **Arquitetura Modular:** Organize o código em Plugins do Fastify. Cada domínio (ex: produtos, nfe, auth) deve ser um plugin registrado via `fastify.register()`.
+- **Validação:** Use `zod` ou a validação nativa JSON Schema do Fastify (`typebox`) para validar rigorosamente todos os *requests* (body, params, querystring) e *responses*.
+- **Separação de Preocupações:** O *Controller* (handler da rota) nunca deve conter regras de negócio. Ele deve apenas receber os dados, chamar a camada de `Services` e retornar a resposta.
+- **Injeção do Prisma:** O Prisma Client deve ser instanciado uma única vez (singleton) e passado pelo contexto do Fastify ou importado de um arquivo centralizado de configuração.
+- **Isolamento de Tenant:** Todo request autenticado deve extrair o `tenant_id` do token e passá-lo obrigatoriamente para as chamadas do Prisma.

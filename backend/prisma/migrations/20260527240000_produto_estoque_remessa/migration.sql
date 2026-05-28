@@ -1,0 +1,12 @@
+-- CreateEnum
+CREATE TYPE "NFeTipo" AS ENUM ('VENDA', 'REMESSA');
+
+-- AlterTable
+ALTER TABLE "tenants" ADD COLUMN "serie_remessa" INTEGER NOT NULL DEFAULT 5;
+
+-- AlterTable
+ALTER TABLE "products" ADD COLUMN "estoque" INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "nfes" ADD COLUMN "quantidade" INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE "nfes" ADD COLUMN "tipo" "NFeTipo" NOT NULL DEFAULT 'VENDA';

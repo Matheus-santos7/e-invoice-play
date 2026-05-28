@@ -1,0 +1,315 @@
+// Convenções: @01-db-dba — tenant_id, snake_case no BD, UUIDs, índices em FKs
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EnvironmentKind {
+  HOMOLOGACAO
+  PRODUCAO
+}
+
+enum FiscalStatus {
+  AUTORIZADA
+  PENDENTE
+  REJEITADA
+  CANCELADA
+  DENEGADA
+}
+
+enum CteModal {
+  RODOVIARIO
+  AEREO
+}
+
+enum TimelineStatus {
+  DONE
+  CURRENT
+  PENDING
+}
+
+enum PedidoStatus {
+  RASCUNHO
+  FATURADO
+}
+
+enum NFeTipo {
+  VENDA
+  REMESSA
+  RETORNO_SIMBOLICO
+  DEVOLUCAO
+}
+
+/// Emitente / filial (multi-tenant) — dados alinhados ao bloco NF-e `<emit>`
+model Tenant {
+  id              String          @id @default(uuid())
+  razaoSocial     String          @map("razao_social")
+  nomeFantasia    String          @map("nome_fantasia")
+  cnpj            String
+  ie              String
+  iest            String?         @map("iest")
+  crt             Int             @default(3)
+  logradouro      String          @map("logradouro")
+  numero          String          @default("SN") @map("numero")
+  complemento     String?         @map("complemento")
+  bairro          String          @map("bairro")
+  codigoMunicipio String          @map("codigo_municipio") @db.VarChar(7)
+  municipio       String          @map("municipio")
+  uf              String          @db.VarChar(2)
+  cep             String          @db.VarChar(8)
+  codigoPais      Int             @default(1058) @map("codigo_pais")
+  nomePais        String          @default("Brasil") @map("nome_pais")
+  telefone        String?         @map("telefone")
+  ambiente        EnvironmentKind
+  serieRemessa    Int             @default(5) @map("serie_remessa")
+  serieCte        Int             @default(1) @map("serie_cte")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  products        Product[]
+  pedidos         Pedido[]
+  nfes            NFe[]
+  ctes            CTe[]
+  fiscalEvents    FiscalEvent[]
+  auditLogs       AuditLog[]
+  timelineSteps   TimelineStep[]
+  taxRules        TaxRule[]
+
+  @@unique([cnpj])
+  @@map("tenants")
+}
+
+model Product {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sku       String   @map("sku")
+  ean       String?  @map("ean")
+  nome      String   @map("nome")
+  ncm       String   @map("ncm")
+  cest      String   @map("cest")
+  exTipi    String?  @map("ex_tipi") @db.VarChar(3)
+  cfop      String   @default("5102") @map("cfop") @db.VarChar(4)
+  origem    Int      @map("origem")
+  unidade   String   @map("unidade")
+  preco     Decimal  @map("preco") @db.Decimal(15, 8)
+  estoque   Int      @default(0) @map("estoque")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  nfes      NFe[]
+  pedidos   Pedido[]
+
+  @@unique([tenantId, sku], map: "uq_product_tenant_sku")
+  @@index([tenantId], map: "idx_product_tenant_id")
+  @@map("products")
+}
+
+/// Pedido ML — editável apenas em RASCUNHO; após faturar vincula NF-e e bloqueia alterações
+model Pedido {
+  id                 String       @id @default(uuid())
+  tenantId           String       @map("tenant_id")
+  tenant             Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productId          String       @map("product_id")
+  product            Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantidade         Int          @default(1)
+  status             PedidoStatus @default(RASCUNHO)
+  pedidoMl           String?      @map("pedido_ml")
+  nfeId              String?      @unique @map("nfe_id")
+  nfe                NFe?         @relation(fields: [nfeId], references: [id], onDelete: SetNull)
+  destCpf            String       @map("dest_cpf")
+  destNome           String       @map("dest_nome")
+  destLogradouro     String       @map("dest_logradouro")
+  destNumero         String       @default("SN") @map("dest_numero")
+  destComplemento    String?      @map("dest_complemento")
+  destBairro         String       @map("dest_bairro")
+  destCodigoMunicipio String      @map("dest_codigo_municipio") @db.VarChar(7)
+  destMunicipio      String       @map("dest_municipio")
+  destUf             String       @map("dest_uf") @db.VarChar(2)
+  destCep            String       @map("dest_cep") @db.VarChar(8)
+  destCodigoPais     Int          @default(1058) @map("dest_codigo_pais")
+  destNomePais       String       @default("Brasil") @map("dest_nome_pais")
+  destTelefone       String?      @map("dest_telefone")
+  destIndIeDest      Int          @default(9) @map("dest_ind_ie_dest")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  @@index([tenantId], map: "idx_pedido_tenant_id")
+  @@index([tenantId, status], map: "idx_pedido_tenant_status")
+  @@map("pedidos")
+}
+
+model NFe {
+  id                 String        @id @default(uuid())
+  tenantId           String        @map("tenant_id")
+  tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productId          String?       @map("product_id")
+  product            Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  chave              String        @unique @db.VarChar(44)
+  numero             Int
+  serie              Int
+  natOp              String        @map("nat_op")
+  cfop               String        @db.VarChar(4)
+  ncm                String
+  destNome           String        @map("dest_nome")
+  destDoc            String        @map("dest_doc")
+  destUf             String        @map("dest_uf") @db.VarChar(2)
+  destLogradouro     String        @default("") @map("dest_logradouro")
+  destNumero         String        @default("SN") @map("dest_numero")
+  destComplemento    String?       @map("dest_complemento")
+  destBairro         String        @default("") @map("dest_bairro")
+  destCodigoMunicipio String       @default("") @map("dest_codigo_municipio") @db.VarChar(7)
+  destMunicipio      String        @default("") @map("dest_municipio")
+  destCep            String        @default("") @map("dest_cep") @db.VarChar(8)
+  destCodigoPais     Int           @default(1058) @map("dest_codigo_pais")
+  destNomePais       String        @default("Brasil") @map("dest_nome_pais")
+  destTelefone       String?       @map("dest_telefone")
+  destIndIeDest      Int           @default(9) @map("dest_ind_ie_dest")
+  valor              Decimal       @db.Decimal(15, 2)
+  valorIcms          Decimal       @map("valor_icms") @db.Decimal(15, 2)
+  aliqIcms           Decimal       @map("aliq_icms") @db.Decimal(5, 2)
+  status             FiscalStatus
+  emitidaEm          DateTime      @map("emitida_em")
+  pedidoMl           String        @map("pedido_ml")
+  quantidade         Int           @default(1) @map("quantidade")
+  tipo               NFeTipo       @default(VENDA) @map("tipo")
+  saldoDisponivel    Int?          @map("saldo_disponivel")
+  fiscalPayload      Json?         @map("fiscal_payload")
+  nfeReferenciaId    String?       @map("nfe_referencia_id")
+  nfeReferencia      NFe?          @relation("NfeReferencia", fields: [nfeReferenciaId], references: [id], onDelete: SetNull)
+  nfeReferenciadas   NFe[]         @relation("NfeReferencia")
+  deletedAt          DateTime?     @map("deleted_at")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  fiscalEvents       FiscalEvent[]
+  pedido             Pedido?
+  cteRemessa         CTe?          @relation("CteRemessaNfe")
+  consumosRemessa    NfeRemessaConsumo[] @relation("ConsumoRetorno")
+  consumosRetorno    NfeRemessaConsumo[] @relation("ConsumoRemessa")
+
+  @@index([tenantId], map: "idx_nfe_tenant_id")
+  @@index([nfeReferenciaId], map: "idx_nfe_referencia_id")
+  @@index([tenantId, productId, tipo, saldoDisponivel], map: "idx_nfe_remessa_saldo")
+  @@index([tenantId, deletedAt], map: "idx_nfe_tenant_deleted")
+  @@index([tenantId, emitidaEm], map: "idx_nfe_tenant_emitida")
+  @@index([productId], map: "idx_nfe_product_id")
+  @@map("nfes")
+}
+
+model CTe {
+  id           String       @id @default(uuid())
+  tenantId     String       @map("tenant_id")
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nfeRemessaId String?      @unique @map("nfe_remessa_id")
+  nfeRemessa   NFe?         @relation("CteRemessaNfe", fields: [nfeRemessaId], references: [id], onDelete: SetNull)
+  chave        String       @unique @db.VarChar(44)
+  numero       Int
+  serie        Int          @default(1)
+  cfop         String       @default("6353") @db.VarChar(4)
+  natOp        String       @default("PRESTAÇÕES DE SERVIÇOS DE TRANSPORTE") @map("nat_op")
+  modal        CteModal
+  origem       String
+  destino      String
+  valor        Decimal      @db.Decimal(15, 2)
+  valorCarga   Decimal      @default(0) @map("valor_carga") @db.Decimal(15, 2)
+  pesoCarga    Decimal      @default(0) @map("peso_carga") @db.Decimal(15, 4)
+  status       FiscalStatus
+  emitidoEm    DateTime     @map("emitido_em")
+  deletedAt    DateTime?    @map("deleted_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  @@index([tenantId], map: "idx_cte_tenant_id")
+  @@index([tenantId, deletedAt], map: "idx_cte_tenant_deleted")
+  @@map("ctes")
+}
+
+/// Consumo FIFO de saldo de remessas por um retorno simbólico
+model NfeRemessaConsumo {
+  id           String   @id @default(uuid())
+  retornoNfeId String   @map("retorno_nfe_id")
+  retornoNfe   NFe      @relation("ConsumoRetorno", fields: [retornoNfeId], references: [id], onDelete: Cascade)
+  remessaNfeId String   @map("remessa_nfe_id")
+  remessaNfe   NFe      @relation("ConsumoRemessa", fields: [remessaNfeId], references: [id], onDelete: Cascade)
+  quantidade   Int      @map("quantidade")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([retornoNfeId, remessaNfeId], map: "nfe_remessa_consumos_retorno_remessa_key")
+  @@index([retornoNfeId], map: "idx_nfe_remessa_consumo_retorno")
+  @@index([remessaNfeId], map: "idx_nfe_remessa_consumo_remessa")
+  @@map("nfe_remessa_consumos")
+}
+
+model FiscalEvent {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nfeId      String   @map("nfe_id")
+  nfe        NFe      @relation(fields: [nfeId], references: [id], onDelete: Cascade)
+  tipo       String   @db.VarChar(6)
+  descricao  String   @map("descricao")
+  ocorridoEm DateTime @map("ocorrido_em")
+  protocolo  String   @map("protocolo")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId], map: "idx_fiscal_event_tenant")
+  @@index([nfeId], map: "idx_fiscal_event_nfe")
+  @@map("fiscal_events")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ator       String
+  acao       String
+  recurso    String
+  ocorridoEm DateTime @map("ocorrido_em")
+  hash       String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId], map: "idx_audit_tenant")
+  @@index([tenantId, ocorridoEm], map: "idx_audit_tenant_time")
+  @@map("audit_logs")
+}
+
+model TimelineStep {
+  id        String         @id @default(uuid())
+  tenantId  String         @map("tenant_id")
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sortOrder Int            @map("sort_order")
+  label     String
+  status    TimelineStatus
+  at        String?        @map("at_time")
+  meta      String?
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  @@index([tenantId], map: "idx_timeline_tenant")
+  @@map("timeline_steps")
+}
+
+model TaxRule {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ruleId          String   @map("rule_id")
+  nome            String
+  tipo            String
+  uf              String
+  cfop            String
+  aliquota        String   @map("aliquota")
+  transactionType String?  @map("transaction_type")
+  customerType    String?  @map("customer_type")
+  origin          String?  @map("origin")
+  source          String   @default("manual") @map("source")
+  payload         Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, ruleId], map: "uq_tax_rule_tenant_rule")
+  @@index([tenantId], map: "idx_tax_rule_tenant")
+  @@map("tax_rules")
+}

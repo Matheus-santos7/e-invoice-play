@@ -9,6 +9,11 @@ lerna-debug.log*
 
 node_modules
 dist
+frontend/.next
+backend/dist
+backend/src/generated
+.env
+backend/.env
 dist-ssr
 .output
 .vinxi
@@ -16,7 +21,7 @@ dist-ssr
 .nitro
 *.local
 
-# Wrangler / Cloudflare
+# Cloudflare (legado Vite — manter se voltar a usar Workers)
 .wrangler/
 .dev.vars
 

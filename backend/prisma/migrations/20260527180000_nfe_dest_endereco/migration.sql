@@ -1,0 +1,23 @@
+-- Endereço completo do destinatário NF-e `<dest>` / `<enderDest>`
+ALTER TABLE "nfes" DROP COLUMN IF EXISTS "product_id";
+
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "product_id" TEXT;
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "dest_logradouro" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "dest_numero" TEXT NOT NULL DEFAULT 'SN';
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "dest_complemento" TEXT;
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "dest_bairro" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "dest_codigo_municipio" VARCHAR(7) NOT NULL DEFAULT '';
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "dest_municipio" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "dest_cep" VARCHAR(8) NOT NULL DEFAULT '';
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "dest_codigo_pais" INTEGER NOT NULL DEFAULT 1058;
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "dest_nome_pais" TEXT NOT NULL DEFAULT 'Brasil';
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "dest_telefone" TEXT;
+ALTER TABLE "nfes" ADD COLUMN IF NOT EXISTS "dest_ind_ie_dest" INTEGER NOT NULL DEFAULT 9;
+
+DO $$ BEGIN
+  ALTER TABLE "nfes" ADD CONSTRAINT "nfes_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE INDEX IF NOT EXISTS "idx_nfe_product_id" ON "nfes"("product_id");
