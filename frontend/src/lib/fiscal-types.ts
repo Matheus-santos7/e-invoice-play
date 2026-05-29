@@ -165,11 +165,13 @@ export type NFeDto = {
   emitidaEm: string;
   pedidoML: string;
   quantidade: number;
-  tipo: "VENDA" | "REMESSA" | "RETORNO_SIMBOLICO" | "DEVOLUCAO";
+  tipo: "VENDA" | "REMESSA" | "RETORNO_SIMBOLICO" | "DEVOLUCAO" | "REMESSA_SIMBOLICA";
   saldoDisponivel?: number;
+  /** Chave da NF-e referenciada por esta nota (pai na cadeia → vai no XML refNFe). */
   nfeReferenciaChave?: string;
   cteChaveRef?: string;
-  referencias?: { chave: string; tipo: string; numero: number; serie: number }[];
+  /** Notas que referenciam esta (filhas na cadeia) — não usar no XML refNFe. */
+  referenciadas?: { chave: string; tipo: string; numero: number; serie: number }[];
   fiscalPayload?: Record<string, unknown>;
 };
 
@@ -216,6 +218,7 @@ export type CTeDto = {
   emitidoEm: string;
   nfeChaveRef?: string;
   vinculadoRemessa: boolean;
+  vinculadoVenda?: boolean;
 };
 
 export type FiscalEventDto = {
@@ -261,6 +264,16 @@ export type TimelineChainDto = {
   emitidaEm: string;
   status: "completa" | "parcial";
   steps: TimelineChainStepDto[];
+};
+
+export type TimelineRemessaGroupDto = {
+  remessaChave: string;
+  remessaNumero?: number;
+  remessaSerie?: number;
+  emitidaEm: string;
+  quantidadeRemessa?: number;
+  saldoDisponivel?: number;
+  cenarios: TimelineChainDto[];
 };
 
 export type ProductDto = {

@@ -7,7 +7,7 @@ import type {
   FiscalEmitterSettingsData,
 } from "./fiscal-emitter-settings-types";
 
-export type NFeTipoUi = "VENDA" | "REMESSA" | "RETORNO_SIMBOLICO" | "DEVOLUCAO";
+export type NFeTipoUi = "VENDA" | "REMESSA" | "RETORNO_SIMBOLICO" | "DEVOLUCAO" | "REMESSA_SIMBOLICA";
 
 export type EmitterSnapshot = {
   modFrete: string;
@@ -47,6 +47,7 @@ export function resolveModFrete(settings: FiscalEmitterSettingsData, tipo: NFeTi
   if (m.mode === "DEFAULT") return "0";
   switch (tipo) {
     case "REMESSA":
+    case "REMESSA_SIMBOLICA":
       return m.coleta;
     case "RETORNO_SIMBOLICO":
       return m.fullfilmentEntrada;
@@ -56,7 +57,9 @@ export function resolveModFrete(settings: FiscalEmitterSettingsData, tipo: NFeTi
 }
 
 function composicaoChannel(tipo: NFeTipoUi): keyof ComposicaoLinha {
-  return tipo === "REMESSA" || tipo === "RETORNO_SIMBOLICO" ? "remessa" : "venda";
+  return tipo === "REMESSA" || tipo === "REMESSA_SIMBOLICA" || tipo === "RETORNO_SIMBOLICO"
+    ? "remessa"
+    : "venda";
 }
 
 function actionDelta(action: BaseCalcAction, amount: number): number {

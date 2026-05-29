@@ -16,7 +16,7 @@ import type {
   TaxRuleDto,
   TenantDto,
   TenantInput,
-  TimelineChainDto,
+  TimelineRemessaGroupDto,
   TimelineStepDto,
 } from "./fiscal-types";
 import type {
@@ -177,6 +177,19 @@ export async function deleteNfe(chave: string): Promise<void> {
   await mutateJson(url(`/api/nfes/${chave}`), "DELETE");
 }
 
+export type DevolucaoResult = {
+  devolucao: NFeDto;
+  remessaSimbolica?: NFeDto;
+  saldoEstornado: { remessaNfeId: string; quantidade: number }[];
+};
+
+export async function emitirDevolucao(chave: string): Promise<DevolucaoResult> {
+  return mutateJson<DevolucaoResult>(
+    url(`/api/nfes/${chave}/devolucao`),
+    "POST",
+  ) as Promise<DevolucaoResult>;
+}
+
 export async function lookupCnpj(cnpj: string): Promise<CnpjLookupDto> {
   const digits = cnpj.replace(/\D/g, "");
   return getJson<CnpjLookupDto>(url(`/api/lookup/cnpj/${digits}`));
@@ -215,8 +228,8 @@ export async function listAuditLogs(tenantId?: string): Promise<AuditEntryDto[]>
   return getJson<AuditEntryDto[]>(url("/api/audit-logs", { tenantId }));
 }
 
-export async function listTimeline(tenantId?: string): Promise<TimelineChainDto[]> {
-  return getJson<TimelineChainDto[]>(url("/api/timeline", { tenantId }));
+export async function listTimeline(tenantId?: string): Promise<TimelineRemessaGroupDto[]> {
+  return getJson<TimelineRemessaGroupDto[]>(url("/api/timeline", { tenantId }));
 }
 
 export async function listTimelineSteps(tenantId?: string): Promise<TimelineStepDto[]> {

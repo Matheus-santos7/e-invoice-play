@@ -92,6 +92,7 @@ const NFE_TIPO_LABEL: Record<NFeTipo, string> = {
   REMESSA: "Remessa",
   RETORNO_SIMBOLICO: "Retorno simbólico",
   DEVOLUCAO: "Devolução",
+  REMESSA_SIMBOLICA: "Remessa simbólica",
 };
 
 export function labelNfeTipo(tipo: NFeTipo): string {
@@ -121,6 +122,7 @@ export function mapCte(
     status: FiscalStatus;
     emitidoEm: Date;
     nfeRemessaId?: string | null;
+    nfeVendaId?: string | null;
   },
   nfeChaveRef?: string,
 ) {
@@ -141,7 +143,8 @@ export function mapCte(
     status: row.status,
     emitidoEm: row.emitidoEm.toISOString(),
     nfeChaveRef: nfeChaveRef ?? undefined,
-    vinculadoRemessa: Boolean(row.nfeRemessaId ?? nfeChaveRef),
+    vinculadoRemessa: Boolean(row.nfeRemessaId ?? row.nfeVendaId ?? nfeChaveRef),
+    vinculadoVenda: Boolean(row.nfeVendaId),
   };
 }
 

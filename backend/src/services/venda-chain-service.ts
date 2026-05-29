@@ -11,6 +11,10 @@ import { enrichTaxSnapshot, loadEmitterSettings } from "../lib/fiscal-emitter-ru
 import { taxSnapshotFromRule } from "../lib/tax-snapshot.js";
 import { consumirSaldoRemessaFifo } from "./remessa-fifo.js";
 import { resolveTaxRule, type CustomerType, type ResolvedTaxRule } from "./tax-rule-service.js";
+import { montarItemFiscal } from "./tax-calculation-service.js";
+import { calcularNotaFiscal } from "../lib/tax-engine.js";
+import { enrichFiscalPayloadWithXTexto } from "../lib/nfe-xtexto.js";
+import { emitirCteVenda } from "./cte-venda-service.js";
 
 function inferAliqIcms(emitUf: string, destUf: string): number {
   return emitUf.toUpperCase() === destUf.toUpperCase() ? 18 : 12;
@@ -55,6 +59,12 @@ export type PedidoForEmit = {
     preco: { toString(): string };
     taxRuleBaseId: string | null;
     nome?: string;
+    sku?: string;
+    ean?: string | null;
+    cest?: string;
+    exTipi?: string | null;
+    unidade?: string;
+    origem?: number;
   };
   tenant: Tenant;
 };
@@ -164,15 +174,23 @@ export async function emitirCadeiaVenda(prisma: PrismaClient, pedido: PedidoForE
         quantidade: pedido.quantidade,
         tipo: NFeTipo.RETORNO_SIMBOLICO,
         saldoDisponivel: null,
-        fiscalPayload: enrichTaxSnapshot(taxSnapshotFromRule(inboundTaxRule, aliqRetornoFallback), {
-          settings: emitterSettings,
-          tipo: NFeTipo.RETORNO_SIMBOLICO,
-          valor: valorTotal,
-          valorIcms: valorIcmsRetorno,
-          emitUf: tenant.uf,
-          destUf: tenant.uf,
-          indFinal: 0,
-        }) as Prisma.InputJsonValue,
+        fiscalPayload: enrichFiscalPayloadWithXTexto(
+          enrichTaxSnapshot(taxSnapshotFromRule(inboundTaxRule, aliqRetornoFallback), {
+            settings: emitterSettings,
+            tipo: NFeTipo.RETORNO_SIMBOLICO,
+            valor: valorTotal,
+            valorIcms: valorIcmsRetorno,
+            emitUf: tenant.uf,
+            destUf: tenant.uf,
+            indFinal: 0,
+          }) as Record<string, unknown>,
+          {
+            tipo: NFeTipo.RETORNO_SIMBOLICO,
+            cfop: inboundTaxRule?.cfop ?? RETORNO_SIMBOLICO_CFOP,
+            natOp: RETORNO_SIMBOLICO_NAT_OP,
+            pedidoMl,
+          },
+        ) as Prisma.InputJsonValue,
       },
     });
 
@@ -199,9 +217,38 @@ export async function emitirCadeiaVenda(prisma: PrismaClient, pedido: PedidoForE
     });
 
     const aliqVendaFallback = inferAliqIcms(tenant.uf, pedido.destUf);
-    const aliqVenda = saleTaxRule?.aliquotaIcmsInterna ?? aliqVendaFallback;
-    const valorIcmsVenda = Math.round(valorTotal * (aliqVenda / 100) * 100) / 100;
+
+    // Engine de cálculo: monta o item com as alíquotas da regra (origem × destino)
+    // e devolve a árvore matemática (ICMS por dentro, DIFAL, totais = soma dos itens).
+    const itemVenda = montarItemFiscal(
+      {
+        codigo: pedido.product.sku ?? pedido.product.id,
+        descricao: pedido.product.nome ?? "Mercadoria",
+        ncm: pedido.product.ncm,
+        cfop: saleTaxRule?.cfop ?? pedido.product.cfop,
+        unidade: pedido.product.unidade ?? "UN",
+        cest: pedido.product.cest,
+        ean: pedido.product.ean ?? undefined,
+        exTipi: pedido.product.exTipi ?? undefined,
+        origem: pedido.product.origem ?? 0,
+        quantidade: pedido.quantidade,
+        valorUnitario: valorUnit,
+      },
+      saleTaxRule,
+      { ufOrigem: tenant.uf, ufDestino: pedido.destUf, customerType },
+      aliqVendaFallback,
+    );
+    const notaVenda = calcularNotaFiscal([itemVenda]);
+
+    const aliqVenda = itemVenda.icms.pICMS || aliqVendaFallback;
+    const valorIcmsVenda = notaVenda.totais.vICMS;
     const telefone = pedido.destTelefone?.replace(/\D/g, "") || "0000000000";
+
+    const natOpVenda =
+      customerType === "non_taxpayer"
+        ? "Venda de mercadoria para consumidor final"
+        : "Venda de mercadorias";
+    const cfopVenda = saleTaxRule?.cfop ?? pedido.product.cfop;
 
     const vendaRow = await tx.nFe.create({
       data: {
@@ -210,8 +257,8 @@ export async function emitirCadeiaVenda(prisma: PrismaClient, pedido: PedidoForE
         chave: chaveVenda,
         numero: numeroVenda,
         serie,
-        natOp: "Venda de mercadoria adquirida de terceiros",
-        cfop: saleTaxRule?.cfop ?? pedido.product.cfop,
+        natOp: natOpVenda,
+        cfop: cfopVenda,
         ncm: pedido.product.ncm,
         destNome: pedido.destNome,
         destDoc: pedido.destCpf,
@@ -236,17 +283,31 @@ export async function emitirCadeiaVenda(prisma: PrismaClient, pedido: PedidoForE
         quantidade: pedido.quantidade,
         tipo: NFeTipo.VENDA,
         nfeReferenciaId: retornoRow.id,
-        fiscalPayload: enrichTaxSnapshot(taxSnapshotFromRule(saleTaxRule, aliqVendaFallback), {
-          settings: emitterSettings,
-          tipo: NFeTipo.VENDA,
-          valor: valorTotal,
-          valorIcms: valorIcmsVenda,
-          emitUf: tenant.uf,
-          destUf: pedido.destUf,
-          indFinal: 1,
-        }) as Prisma.InputJsonValue,
+        fiscalPayload: enrichFiscalPayloadWithXTexto(
+          {
+            ...enrichTaxSnapshot(taxSnapshotFromRule(saleTaxRule, aliqVendaFallback), {
+              settings: emitterSettings,
+              tipo: NFeTipo.VENDA,
+              valor: valorTotal,
+              valorIcms: valorIcmsVenda,
+              emitUf: tenant.uf,
+              destUf: pedido.destUf,
+              indFinal: 1,
+            }),
+            engine: notaVenda,
+          } as Record<string, unknown>,
+          {
+            tipo: NFeTipo.VENDA,
+            cfop: cfopVenda,
+            natOp: natOpVenda,
+            pedidoMl,
+            indFinal: 1,
+          },
+        ) as Prisma.InputJsonValue,
       },
     });
+
+    const cteVenda = await emitirCteVenda(tx, tenant, vendaRow);
 
     const retornoComRef = await tx.nFe.findUniqueOrThrow({
       where: { id: retornoRow.id },
@@ -258,6 +319,7 @@ export async function emitirCadeiaVenda(prisma: PrismaClient, pedido: PedidoForE
     return {
       venda: mapNfe(vendaRow, retornoRow.chave),
       retorno: mapNfe(retornoComRef, retornoComRef.nfeReferencia?.chave),
+      cteVenda,
       alocacoes,
     };
   });

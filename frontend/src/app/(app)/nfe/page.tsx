@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FiscalDocumentDeleteButton } from "@/components/fiscal-document-delete-button";
+import { NfeDevolucaoButton } from "@/components/nfe-devolucao-button";
 import { NfeXmlActions } from "@/components/nfe-xml-actions";
 import { PageHeader, StatusBadge } from "@/components/fiscal-ui";
 import { resolveActiveTenantId } from "@/lib/active-tenant";
@@ -21,6 +22,13 @@ function sortNfesForList<T extends { emitidaEm: string; serie: number; numero: n
 export default async function NFeListPage() {
   const tenantId = await resolveActiveTenantId();
   const nfes = sortNfesForList(await listNfes(tenantId));
+
+  // Vendas que já possuem devolução (a devolução referencia a chave da venda).
+  const vendasDevolvidas = new Set(
+    nfes
+      .filter((n) => n.tipo === "DEVOLUCAO" && n.nfeReferenciaChave)
+      .map((n) => n.nfeReferenciaChave as string),
+  );
 
   return (
     <div className="p-6">
@@ -55,7 +63,7 @@ export default async function NFeListPage() {
                 <th className="px-4 py-3 font-medium">ICMS</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium text-right">XML</th>
-                <th className="px-4 py-3 font-medium w-12" aria-label="Excluir" />
+                <th className="px-4 py-3 font-medium w-20 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -78,16 +86,20 @@ export default async function NFeListPage() {
                       className={
                         nfe.tipo === "REMESSA"
                           ? "text-[11px] font-bold uppercase tracking-wider text-amber-500"
-                          : "text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
+                          : nfe.tipo === "REMESSA_SIMBOLICA"
+                            ? "text-[11px] font-bold uppercase tracking-wider text-orange-400"
+                            : "text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
                       }
                     >
                       {nfe.tipo === "REMESSA"
                         ? "Remessa"
-                        : nfe.tipo === "RETORNO_SIMBOLICO"
-                          ? "Retorno"
-                          : nfe.tipo === "DEVOLUCAO"
-                            ? "Devolução"
-                            : "Venda"}
+                        : nfe.tipo === "REMESSA_SIMBOLICA"
+                          ? "Remessa simb."
+                          : nfe.tipo === "RETORNO_SIMBOLICO"
+                            ? "Retorno"
+                            : nfe.tipo === "DEVOLUCAO"
+                              ? "Devolução"
+                              : "Venda"}
                     </span>
                   </td>
                   <td className="px-4 py-3 font-mono">{nfe.cfop}</td>
@@ -114,11 +126,20 @@ export default async function NFeListPage() {
                     <NfeXmlActions chave={nfe.chave} />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <FiscalDocumentDeleteButton
-                      tipo="nfe"
-                      chave={nfe.chave}
-                      label={`${nfe.numero}/${nfe.serie}`}
-                    />
+                    <div className="flex items-center justify-end gap-1">
+                      {nfe.tipo === "VENDA" && (
+                        <NfeDevolucaoButton
+                          chave={nfe.chave}
+                          label={`${nfe.numero}/${nfe.serie}`}
+                          jaDevolvida={vendasDevolvidas.has(nfe.chave)}
+                        />
+                      )}
+                      <FiscalDocumentDeleteButton
+                        tipo="nfe"
+                        chave={nfe.chave}
+                        label={`${nfe.numero}/${nfe.serie}`}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}

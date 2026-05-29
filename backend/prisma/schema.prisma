@@ -42,6 +42,7 @@ enum NFeTipo {
   REMESSA
   RETORNO_SIMBOLICO
   DEVOLUCAO
+  REMESSA_SIMBOLICA
 }
 
 /// Emitente / filial (multi-tenant) — dados alinhados ao bloco NF-e `<emit>`
@@ -202,6 +203,7 @@ model NFe {
   fiscalEvents       FiscalEvent[]
   pedido             Pedido?
   cteRemessa         CTe?          @relation("CteRemessaNfe")
+  cteVenda           CTe?          @relation("CteVendaNfe")
   consumosRemessa    NfeRemessaConsumo[] @relation("ConsumoRetorno")
   consumosRetorno    NfeRemessaConsumo[] @relation("ConsumoRemessa")
 
@@ -220,6 +222,8 @@ model CTe {
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nfeRemessaId String?      @unique @map("nfe_remessa_id")
   nfeRemessa   NFe?         @relation("CteRemessaNfe", fields: [nfeRemessaId], references: [id], onDelete: SetNull)
+  nfeVendaId   String?      @unique @map("nfe_venda_id")
+  nfeVenda     NFe?         @relation("CteVendaNfe", fields: [nfeVendaId], references: [id], onDelete: SetNull)
   chave        String       @unique @db.VarChar(44)
   numero       Int
   serie        Int          @default(1)

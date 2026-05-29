@@ -80,11 +80,11 @@ export default async function NFeDetailPage({ params }: Props) {
             </div>
           )}
 
-          {nfe.referencias && nfe.referencias.length > 0 && (
+          {nfe.referenciadas && nfe.referenciadas.length > 0 && (
             <div className="border border-border rounded-lg bg-card p-4 space-y-2">
               <h3 className="text-[12px] uppercase tracking-widest font-bold text-muted-foreground">Documentos posteriores</h3>
               <ul className="space-y-1">
-                {nfe.referencias.map((r) => (
+                {nfe.referenciadas.map((r) => (
                   <li key={r.chave}>
                     <Link href={`/nfe/${r.chave}`} className="font-mono text-[13px] text-accent hover:underline">
                       {r.tipo} {r.numero}/{r.serie}

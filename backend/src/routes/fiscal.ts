@@ -5,6 +5,7 @@ import { mapEmitente } from "../lib/tenant-mapper.js";
 import { FiscalService, fiscalNotDeleted } from "../services/fiscal-service.js";
 import { listTaxRuleCatalog } from "../services/tax-rule-catalog-service.js";
 import { listTimelineChains } from "../services/timeline-service.js";
+import { DevolucaoError, emitirDevolucaoVenda } from "../services/devolucao-service.js";
 
 const tenantQuery = z.object({
   tenantId: z.string().uuid().optional(),
@@ -51,6 +52,7 @@ export const fiscalRoutes: FastifyPluginAsync = async (app) => {
       where: { chave, ...fiscalNotDeleted },
       include: {
         cteRemessa: { select: { chave: true } },
+        cteVenda: { select: { chave: true } },
         nfeReferencia: { select: { chave: true, tipo: true, numero: true, serie: true } },
         nfeReferenciadas: { select: { chave: true, tipo: true, numero: true, serie: true } },
       },
@@ -59,8 +61,8 @@ export const fiscalRoutes: FastifyPluginAsync = async (app) => {
     const dto = mapNfe(row, row.nfeReferencia?.chave);
     return {
       ...dto,
-      cteChaveRef: row.cteRemessa?.chave,
-      referencias: row.nfeReferenciadas.map((n) => ({
+      cteChaveRef: row.cteRemessa?.chave ?? row.cteVenda?.chave,
+      referenciadas: row.nfeReferenciadas.map((n) => ({
         chave: n.chave,
         tipo: n.tipo,
         numero: n.numero,
@@ -74,6 +76,21 @@ export const fiscalRoutes: FastifyPluginAsync = async (app) => {
     const removed = await fiscal.softDeleteNfe(chave);
     if (!removed) return reply.status(404).send({ error: "NF-e não encontrada" });
     return reply.status(204).send();
+  });
+
+  // Emite a devolução de uma venda: referencia a NF-e original e estorna o
+  // saldo consumido de volta às remessas da cadeia.
+  app.post("/nfes/:chave/devolucao", async (req, reply) => {
+    try {
+      const { chave } = chaveParam.parse(req.params);
+      const result = await emitirDevolucaoVenda(app.prisma, chave);
+      return reply.status(201).send(result);
+    } catch (e) {
+      if (e instanceof DevolucaoError) {
+        return reply.status(e.status).send({ error: e.message });
+      }
+      throw e;
+    }
   });
 
   app.get("/emitente", async (req) => {

@@ -16,6 +16,7 @@ import {
 } from "../lib/remessa-dest.js";
 import { enrichTaxSnapshot, loadEmitterSettings } from "../lib/fiscal-emitter-runtime.js";
 import { taxSnapshotFromRule } from "../lib/tax-snapshot.js";
+import { enrichFiscalPayloadWithXTexto } from "../lib/nfe-xtexto.js";
 import { emitirCteRemessa } from "./cte-remessa-service.js";
 import { lineTotal, productUnitPrice } from "../lib/product-pricing.js";
 import { resolveTaxRule } from "./tax-rule-service.js";
@@ -83,9 +84,8 @@ export async function emitirNFeRemessa(
 
   const { nfeRow, cteRow } = await prisma.$transaction(async (tx) => {
     const emitterSettings = await loadEmitterSettings(tx, tenant.id);
-    const fiscalPayload = enrichTaxSnapshot(
-      taxSnapshotFromRule(remessaTaxRule, aliqFallback),
-      {
+    const fiscalPayload = enrichFiscalPayloadWithXTexto(
+      enrichTaxSnapshot(taxSnapshotFromRule(remessaTaxRule, aliqFallback), {
         settings: emitterSettings,
         tipo: NFeTipo.REMESSA,
         valor,
@@ -93,6 +93,12 @@ export async function emitirNFeRemessa(
         emitUf: tenant.uf,
         destUf: REMESSA_ML_DEST.uf,
         indFinal: 0,
+      }) as Record<string, unknown>,
+      {
+        tipo: NFeTipo.REMESSA,
+        cfop: cfopRemessa,
+        natOp: REMESSA_NAT_OP,
+        pedidoMl,
       },
     );
 

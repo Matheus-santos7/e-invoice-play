@@ -37,7 +37,12 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-4 gap-4">
         <KPI label="NF-e (tenant)" value={String(nfes.length)} hint="Notas retornadas pela API" hintTone="success" />
         <KPI label="ICMS (amostra)" value={featured ? brl(featured.valorICMS) : brl(0)} hint="Primeira NF-e da lista" hintTone="muted" />
-        <KPI label="Cadeias fiscais" value={String(timeline.length)} hint="Remessa → Retorno → Venda" hintTone="accent" />
+        <KPI
+          label="Cadeias fiscais"
+          value={String(timeline.reduce((acc, g) => acc + g.cenarios.length, 0))}
+          hint={`${timeline.filter((g) => g.remessaChave).length} remessa(s) · cenários`}
+          hintTone="accent"
+        />
         <KPI label="Conformidade" value="100%" hint="Simulação" hintTone="success" />
       </div>
 
@@ -104,7 +109,7 @@ export default async function DashboardPage() {
         <div className="col-span-4 space-y-6">
           <div className="border border-border rounded-lg bg-card animate-slide-in">
             <SectionHeader title="Timeline — Cadeias de NF-e" />
-            <TimelineChains chains={timeline} />
+            <TimelineChains groups={timeline} />
           </div>
 
           {featured && xml ? (
