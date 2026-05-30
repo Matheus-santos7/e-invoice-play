@@ -1,6 +1,14 @@
+/**
+ * Emissão de NF-e de remessa física para depósito temporário (full).
+ *
+ * - Destinatário = unidade logística ML selecionada (planilha) ou fallback legado.
+ * - `saldoDisponivel` = quantidade enviada (base do FIFO por CD).
+ * - Emite CT-e de remessa na mesma transação quando aplicável.
+ */
 import {
   FiscalStatus,
   NFeTipo,
+  OperacaoFiscalTipo,
   Prisma,
   type PrismaClient,
   type Product,
@@ -9,17 +17,16 @@ import {
 import { mapNfe } from "../lib/fiscal-mappers.js";
 import { buildChaveNFe, gerarPedidoMl } from "../lib/nfe-chave.js";
 import { proximoNumeroNfe } from "../lib/nfe-sequencia.js";
-import {
-  REMESSA_CFOP,
-  REMESSA_ML_DEST,
-  REMESSA_NAT_OP,
-} from "../lib/remessa-dest.js";
+import { REMESSA_CFOP, REMESSA_NAT_OP } from "../lib/remessa-dest.js";
+import type { UnidadeDestinoFiscal } from "../lib/meli-unidade.js";
 import { enrichTaxSnapshot, loadEmitterSettings } from "../lib/fiscal-emitter-runtime.js";
 import { taxSnapshotFromRule } from "../lib/tax-snapshot.js";
 import { enrichFiscalPayloadWithXTexto } from "../lib/nfe-xtexto.js";
 import { emitirCteRemessa } from "./cte-remessa-service.js";
 import { lineTotal, productUnitPrice } from "../lib/product-pricing.js";
 import { resolveTaxRule } from "./tax-rule-service.js";
+import { UnidadeLogisticaService } from "./unidade-logistica-service.js";
+import { registrarMovimentacaoProduto } from "./movimentacao-produto-service.js";
 
 /** Alíquota ICMS remessa interestadual (modelo PR → SC ML: 4%). */
 function inferAliqIcmsRemessa(emitUf: string, destUf: string): number {
@@ -27,15 +34,28 @@ function inferAliqIcmsRemessa(emitUf: string, destUf: string): number {
   return 4;
 }
 
+export type EmitirRemessaOptions = {
+  unidadeDestinoId?: string;
+  pedidoMl?: string;
+  observacaoAvanco?: string;
+};
+
 export async function emitirNFeRemessa(
   prisma: PrismaClient,
   tenant: Tenant,
   product: Product,
   quantidade: number,
+  options?: EmitirRemessaOptions,
 ) {
   if (quantidade < 1) {
     throw new RemessaError("Quantidade para remessa deve ser pelo menos 1");
   }
+
+  const unidadeService = new UnidadeLogisticaService(prisma);
+  const { unidade, destino } = await unidadeService.resolveDestinoRemessa(
+    tenant.id,
+    options?.unidadeDestinoId,
+  );
 
   const serie = tenant.serieRemessa;
   const numero = await proximoNumeroNfe(prisma, tenant.id, serie);
@@ -46,7 +66,7 @@ export async function emitirNFeRemessa(
     );
   }
   const valor = lineTotal(unitCusto, quantidade);
-  const pedidoMl = gerarPedidoMl();
+  const pedidoMl = options?.pedidoMl ?? gerarPedidoMl();
 
   const chave = buildChaveNFe({
     uf: tenant.uf,
@@ -66,21 +86,23 @@ export async function emitirNFeRemessa(
 
   const remessaTaxRule = await resolveTaxRule(prisma, tenant.id, {
     originUf: tenant.uf,
-    destinationUf: REMESSA_ML_DEST.uf,
+    destinationUf: destino.uf,
     transactionType: "inbound",
     customerType: "taxpayer",
     ruleBaseId,
   });
   if (!remessaTaxRule) {
     throw new RemessaError(
-      `Regra "${ruleBaseId}" sem linha de remessa (origem ${tenant.uf} → ${REMESSA_ML_DEST.uf}). Importe ou revise a planilha.`,
+      `Regra "${ruleBaseId}" sem linha de remessa (origem ${tenant.uf} → ${destino.uf}). Importe ou revise a planilha.`,
     );
   }
 
-  const aliqFallback = inferAliqIcmsRemessa(tenant.uf, REMESSA_ML_DEST.uf);
+  const aliqFallback = inferAliqIcmsRemessa(tenant.uf, destino.uf);
   const aliqIcms = remessaTaxRule.aliquotaIcmsInterna ?? aliqFallback;
   const valorIcms = Math.round(valor * (aliqIcms / 100) * 100) / 100;
   const cfopRemessa = remessaTaxRule.cfop?.trim() || REMESSA_CFOP;
+
+  const destData = destinoToNfeFields(destino);
 
   const { nfeRow, cteRow } = await prisma.$transaction(async (tx) => {
     const emitterSettings = await loadEmitterSettings(tx, tenant.id);
@@ -91,7 +113,7 @@ export async function emitirNFeRemessa(
         valor,
         valorIcms,
         emitUf: tenant.uf,
-        destUf: REMESSA_ML_DEST.uf,
+        destUf: destino.uf,
         indFinal: 0,
       }) as Record<string, unknown>,
       {
@@ -112,19 +134,7 @@ export async function emitirNFeRemessa(
         natOp: REMESSA_NAT_OP,
         cfop: cfopRemessa,
         ncm: product.ncm,
-        destNome: REMESSA_ML_DEST.nome,
-        destDoc: REMESSA_ML_DEST.cnpj,
-        destUf: REMESSA_ML_DEST.uf,
-        destLogradouro: REMESSA_ML_DEST.logradouro,
-        destNumero: REMESSA_ML_DEST.numero,
-        destComplemento: REMESSA_ML_DEST.complemento,
-        destBairro: REMESSA_ML_DEST.bairro,
-        destCodigoMunicipio: REMESSA_ML_DEST.codigoMunicipio,
-        destMunicipio: REMESSA_ML_DEST.municipio,
-        destCep: REMESSA_ML_DEST.cep,
-        destCodigoPais: REMESSA_ML_DEST.codigoPais,
-        destNomePais: REMESSA_ML_DEST.nomePais,
-        destIndIeDest: REMESSA_ML_DEST.indIeDest,
+        ...destData,
         valor,
         valorIcms,
         aliqIcms,
@@ -134,15 +144,44 @@ export async function emitirNFeRemessa(
         quantidade,
         tipo: NFeTipo.REMESSA,
         saldoDisponivel: quantidade,
+        unidadeDestinoId: unidade?.id ?? undefined,
         fiscalPayload: fiscalPayload as Prisma.InputJsonValue,
       },
     });
 
-    const cteRow = await emitirCteRemessa(tx, tenant, nfeRow, product);
+    await registrarMovimentacaoProduto(tx, {
+      tenantId: tenant.id,
+      productId: product.id,
+      tipoOperacao: OperacaoFiscalTipo.REMESSA,
+      quantidade,
+      unidadeDestinoId: unidade?.id ?? undefined,
+      nfeId: nfeRow.id,
+      observacao: options?.observacaoAvanco ?? (unidade ? `Remessa para ${unidade.codigo}` : undefined),
+    });
+
+    const cteRow = await emitirCteRemessa(tx, tenant, nfeRow);
     return { nfeRow, cteRow };
   });
 
   return { nfe: mapNfe(nfeRow), cte: cteRow };
+}
+
+function destinoToNfeFields(destino: UnidadeDestinoFiscal) {
+  return {
+    destNome: destino.nome,
+    destDoc: destino.cnpj,
+    destUf: destino.uf,
+    destLogradouro: destino.logradouro,
+    destNumero: destino.numero,
+    destComplemento: destino.complemento,
+    destBairro: destino.bairro,
+    destCodigoMunicipio: destino.codigoMunicipio,
+    destMunicipio: destino.municipio,
+    destCep: destino.cep,
+    destCodigoPais: destino.codigoPais,
+    destNomePais: destino.nomePais,
+    destIndIeDest: destino.indIeDest,
+  };
 }
 
 export class RemessaError extends Error {

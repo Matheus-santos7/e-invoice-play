@@ -61,9 +61,10 @@ flowchart TB
     RS2 --> RT2b[Retorno] --> V2b[Nova venda]
   end
 
-  subgraph C3["Cenário 3 — Avanço de CD (futuro)"]
-    R3[Remessa CD A] --> RT3[Retorno] --> RS3[Remessa simbólica<br/>troca de CD/UF]
-    RS3 --> RT3b[Retorno CD B] --> V3[Venda]
+  subgraph C3["Cenário 3 — Avanço entre CDs"]
+    R3[Remessa CD A] --> RS3[Remessa simbólica<br/>saída CD A]
+    RS3 --> R3b[Remessa física CD B]
+    R3b --> RT3[Retorno] --> V3[Venda]
   end
 ```
 
@@ -208,7 +209,7 @@ Gerado em `nfe-xtexto.ts` e persistido em `fiscalPayload.obsContXTexto`.
 
 ```
 e-invoice-play/
-├── backend/                    # API Fastify + engine fiscal
+├── backend/                    # API Fastify + engine fiscal (ver `backend/docs/COMENTARIOS.md`)
 │   ├── prisma/                 # Schema, migrations, seed
 │   └── src/
 │       ├── lib/                # tax-engine, nfe-xtexto, chaves, mappers
@@ -240,6 +241,8 @@ e-invoice-play/
 | NF-e | `GET /nfes`, `GET /nfes/:chave`, `POST /nfes/:chave/devolucao` |
 | CT-e | `GET /ctes`, `GET /ctes/:chave` |
 | Regras | `GET /tax-rules`, `POST /tax-rules/bulk-upsert` |
+| Unidades ML | `GET /unidades-logisticas`, `POST /unidades-logisticas/bulk-import`, `PATCH /unidades-logisticas/:id/padrao` |
+| Movimentações | `POST /movimentacoes/avanco-cd`, `GET /movimentacoes-produto` |
 | Configurações | `GET/PUT /fiscal-settings` |
 | Timeline | `GET /timeline` (cadeias por remessa) |
 | Lookup | `GET /lookup/cnpj/:cnpj`, `GET /lookup/cep/:cep` |
@@ -254,6 +257,7 @@ Base URL local: `http://localhost:3001` (prefixo conforme proxy do frontend em `
 |------|--------|
 | `/` | Dashboard, KPIs, timeline de cadeias, preview XML |
 | `/produtos` | CRUD, importação planilha, remessa em lote |
+| `/unidades-logisticas` | Importação CDs Meli Full, CD padrão de remessa, avanço entre CDs |
 | `/pedidos` | Rascunhos e faturamento (cadeia retorno + venda) |
 | `/nfe` | Listagem, devolução, visualização XML |
 | `/cte` | CT-e de remessa e venda |
@@ -334,12 +338,13 @@ A pasta `XMLs/` contém **procNFe** reais de operação fulfillment (Atlas × Me
 - CT-e remessa e CT-e venda referenciados  
 - Timeline agrupada por remessa  
 - Importação de regras e produtos via planilha  
+- Unidades logísticas Meli Full (planilha `.xlsx`), destino de remessa por CD e avanço entre CDs com rastreio fiscal  
 
 **Em evolução / não escopo atual**
 
 - Transmissão real SEFAZ (autorização, cancelamento, CC-e)  
 - Certificado A1/A3 e assinatura XML-DSig válida  
-- Cadastro de **CDs do full** por UF para avanço entre depósitos (cenário 3)  
+- Retorno simbólico automático no avanço entre CDs (hoje: remessa simbólica + remessa física no destino)  
 - GNRE, MDF-e, NFS-e  
 - Emissão em produção (`tpAmb=1`)  
 

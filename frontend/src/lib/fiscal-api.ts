@@ -384,3 +384,133 @@ export async function patchFiscalEmitterSettings(
 ): Promise<FiscalEmitterSettingsView> {
   return mutateJson<FiscalEmitterSettingsView>(url("/api/fiscal-settings", { tenantId }), "PATCH", patch) as Promise<FiscalEmitterSettingsView>;
 }
+
+export type UnidadeLogisticaImportRow = {
+  unidade: string;
+  cnpj: string | number;
+  inscricaoEstadual?: string | number;
+  logradouro: string;
+  numero: string;
+  cidade: string;
+  uf: string;
+  cep: string | number;
+};
+
+export type UnidadeLogisticaDto = {
+  id: string;
+  tenantId: string;
+  codigo: string;
+  nome: string;
+  destNomeFiscal: string;
+  cnpj: string;
+  ie?: string;
+  endereco: {
+    logradouro: string;
+    numero: string;
+    complemento?: string;
+    bairro: string;
+    municipio: string;
+    uf: string;
+    cep: string;
+    codigoMunicipio: string;
+  };
+  ativa: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UnidadeLogisticaBulkImportResult = {
+  totalPlanilha: number;
+  unicos: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: { line: number; message: string }[];
+};
+
+export type AvancoCdResult = {
+  remessaSimbolica: NFeDto;
+  remessaDestino: NFeDto;
+  cte?: CTeDto;
+  alocacoesOrigem: { remessaNfeId: string; quantidade: number }[];
+};
+
+export type MovimentacaoProdutoDto = {
+  id: string;
+  tipoOperacao: string;
+  quantidade: number;
+  unidadeOrigemId?: string;
+  unidadeDestinoId?: string;
+  unidadeOrigem?: { codigo: string; nome: string };
+  unidadeDestino?: { codigo: string; nome: string };
+  nfeId: string;
+  nfe?: { chave: string; tipo: string; numero: number; serie: number };
+  nfeSecundariaId?: string;
+  nfeSecundaria?: { chave: string; tipo: string; numero: number; serie: number };
+  observacao?: string;
+  createdAt: string;
+};
+
+export async function listUnidadesLogisticas(
+  tenantId: string,
+  opts?: { q?: string; ativa?: boolean },
+): Promise<UnidadeLogisticaDto[]> {
+  return getJson<UnidadeLogisticaDto[]>(
+    url("/api/unidades-logisticas", {
+      tenantId,
+      q: opts?.q,
+      ativa: opts?.ativa === false ? "false" : opts?.ativa === true ? "true" : undefined,
+    }),
+  );
+}
+
+export async function bulkImportUnidadesLogisticas(
+  tenantId: string,
+  rows: UnidadeLogisticaImportRow[],
+  enrichCep = true,
+): Promise<UnidadeLogisticaBulkImportResult> {
+  return mutateJson<UnidadeLogisticaBulkImportResult>(
+    url("/api/unidades-logisticas/bulk-import", { tenantId }),
+    "POST",
+    { tenantId, rows, enrichCep },
+  ) as Promise<UnidadeLogisticaBulkImportResult>;
+}
+
+export async function setUnidadeLogisticaPadrao(
+  tenantId: string,
+  unidadeId: string,
+): Promise<UnidadeLogisticaDto> {
+  return mutateJson<UnidadeLogisticaDto>(
+    url(`/api/unidades-logisticas/${unidadeId}/padrao`, { tenantId }),
+    "PATCH",
+    { tenantId },
+  ) as Promise<UnidadeLogisticaDto>;
+}
+
+export async function emitirAvancoCd(
+  tenantId: string,
+  body: {
+    productId: string;
+    quantidade: number;
+    unidadeOrigemId: string;
+    unidadeDestinoId: string;
+  },
+): Promise<AvancoCdResult> {
+  return mutateJson<AvancoCdResult>(url("/api/movimentacoes/avanco-cd", { tenantId }), "POST", {
+    tenantId,
+    ...body,
+  }) as Promise<AvancoCdResult>;
+}
+
+export async function listMovimentacoesProduto(
+  tenantId: string,
+  opts?: { productId?: string; limit?: number },
+): Promise<MovimentacaoProdutoDto[]> {
+  return getJson<MovimentacaoProdutoDto[]>(
+    url("/api/movimentacoes-produto", {
+      tenantId,
+      productId: opts?.productId,
+      limit: opts?.limit != null ? String(opts.limit) : undefined,
+    }),
+  );
+}

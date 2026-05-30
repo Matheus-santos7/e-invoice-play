@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   FileText,
   Truck,
+  Warehouse,
   Scale,
   Bell,
   Sparkles,
@@ -24,6 +25,7 @@ const NAV_OPERACIONAL = [
   { href: "/pedidos", label: "Pedidos", icon: ShoppingCart },
   { href: "/nfe", label: "NF-e Emitidas", icon: FileText },
   { href: "/cte", label: "CT-e Transportes", icon: Truck },
+  { href: "/unidades-logisticas", label: "Unidades ML", icon: Warehouse },
 ] as const;
 
 const NAV_CONFIG = [

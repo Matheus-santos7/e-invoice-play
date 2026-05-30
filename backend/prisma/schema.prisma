@@ -45,6 +45,15 @@ enum NFeTipo {
   REMESSA_SIMBOLICA
 }
 
+enum OperacaoFiscalTipo {
+  REMESSA
+  AVANCO_CD
+  RETORNO_SIMBOLICO
+  VENDA
+  DEVOLUCAO
+  REMESSA_SIMBOLICA
+}
+
 /// Emitente / filial (multi-tenant) — dados alinhados ao bloco NF-e `<emit>`
 model Tenant {
   id              String          @id @default(uuid())
@@ -80,9 +89,75 @@ model Tenant {
   timelineSteps   TimelineStep[]
   taxRules              TaxRule[]
   fiscalEmitterSettings FiscalEmitterSettings?
+  unidadeLogisticaPadraoId String?              @map("unidade_logistica_padrao_id")
+  unidadeLogisticaPadrao   MeliUnidadeLogistica? @relation("TenantUnidadePadrao", fields: [unidadeLogisticaPadraoId], references: [id], onDelete: SetNull)
+  meliUnidades             MeliUnidadeLogistica[]
+  movimentacoesProduto     MovimentacaoProduto[]
 
   @@unique([cnpj])
   @@map("tenants")
+}
+
+/// CD / unidade logística Mercado Livre Full (importação da planilha Meli).
+model MeliUnidadeLogistica {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  codigo          String   @db.VarChar(32)
+  nome            String
+  destNomeFiscal  String   @default("EBAZAR.COM.BR LTDA") @map("dest_nome_fiscal")
+  cnpj            String   @db.VarChar(14)
+  ie              String?
+  logradouro      String
+  numero          String   @default("SN")
+  complemento     String?
+  bairro          String   @default("")
+  municipio       String
+  uf              String   @db.VarChar(2)
+  cep             String   @db.VarChar(8)
+  codigoMunicipio String   @default("") @map("codigo_municipio") @db.VarChar(7)
+  codigoPais      Int      @default(1058) @map("codigo_pais")
+  nomePais        String   @default("Brasil") @map("nome_pais")
+  indIeDest       Int      @default(1) @map("ind_ie_dest")
+  ativa           Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  nfesDestino              NFe[]                 @relation("NfeUnidadeDestino")
+  nfesOrigem               NFe[]                 @relation("NfeUnidadeOrigem")
+  movimentacoesOrigem      MovimentacaoProduto[] @relation("MovUnidadeOrigem")
+  movimentacoesDestino     MovimentacaoProduto[] @relation("MovUnidadeDestino")
+  tenantsComoPadrao        Tenant[]              @relation("TenantUnidadePadrao")
+
+  @@unique([tenantId, cnpj])
+  @@unique([tenantId, codigo])
+  @@index([tenantId, ativa])
+  @@map("meli_unidades_logisticas")
+}
+
+/// Rastreio operacional: cada movimentação de estoque ligada à NF-e (e CD quando aplicável).
+model MovimentacaoProduto {
+  id               String             @id @default(uuid())
+  tenantId         String             @map("tenant_id")
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productId        String             @map("product_id")
+  product          Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tipoOperacao     OperacaoFiscalTipo @map("tipo_operacao")
+  quantidade       Int
+  unidadeOrigemId  String?            @map("unidade_origem_id")
+  unidadeOrigem    MeliUnidadeLogistica? @relation("MovUnidadeOrigem", fields: [unidadeOrigemId], references: [id], onDelete: SetNull)
+  unidadeDestinoId String?            @map("unidade_destino_id")
+  unidadeDestino   MeliUnidadeLogistica? @relation("MovUnidadeDestino", fields: [unidadeDestinoId], references: [id], onDelete: SetNull)
+  nfeId            String             @map("nfe_id")
+  nfe              NFe                @relation(fields: [nfeId], references: [id], onDelete: Cascade)
+  nfeSecundariaId  String?            @map("nfe_secundaria_id")
+  nfeSecundaria    NFe?               @relation("MovNfeSecundaria", fields: [nfeSecundariaId], references: [id], onDelete: SetNull)
+  observacao       String?
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  @@index([tenantId, productId, createdAt])
+  @@index([nfeId])
+  @@map("movimentacoes_produto")
 }
 
 /// Configurações gerais do emissor de NF-e (hub estilo Mercado Livre)
@@ -116,8 +191,9 @@ model Product {
   taxRuleBaseId   String?  @map("tax_rule_base_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  nfes      NFe[]
-  pedidos   Pedido[]
+  nfes                  NFe[]
+  pedidos               Pedido[]
+  movimentacoesProduto  MovimentacaoProduto[]
 
   @@unique([tenantId, sku], map: "uq_product_tenant_sku")
   @@index([tenantId], map: "idx_product_tenant_id")
@@ -207,8 +283,15 @@ model NFe {
   cteVenda           CTe?          @relation("CteVendaNfe")
   consumosRemessa    NfeRemessaConsumo[] @relation("ConsumoRetorno")
   consumosRetorno    NfeRemessaConsumo[] @relation("ConsumoRemessa")
+  unidadeDestinoId   String?             @map("unidade_destino_id")
+  unidadeDestino     MeliUnidadeLogistica? @relation("NfeUnidadeDestino", fields: [unidadeDestinoId], references: [id], onDelete: SetNull)
+  unidadeOrigemId    String?             @map("unidade_origem_id")
+  unidadeOrigem      MeliUnidadeLogistica? @relation("NfeUnidadeOrigem", fields: [unidadeOrigemId], references: [id], onDelete: SetNull)
+  movimentacoesProduto MovimentacaoProduto[]
+  movimentacoesComoSecundaria MovimentacaoProduto[] @relation("MovNfeSecundaria")
 
   @@index([tenantId], map: "idx_nfe_tenant_id")
+  @@index([unidadeDestinoId], map: "idx_nfe_unidade_destino")
   @@index([nfeReferenciaId], map: "idx_nfe_referencia_id")
   @@index([tenantId, productId, tipo, saldoDisponivel], map: "idx_nfe_remessa_saldo")
   @@index([tenantId, deletedAt], map: "idx_nfe_tenant_deleted")

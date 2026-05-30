@@ -1,3 +1,9 @@
+/**
+ * Operações transversais de documentos fiscais (exclusão lógica).
+ *
+ * NF-e e CT-e não são apagados do banco: `deletedAt` oculta da listagem.
+ * Isso não cancela na SEFAZ — use `cancelamento-service` para evento 110111.
+ */
 import type { PrismaClient } from "../generated/prisma/client.js";
 
 export class FiscalService {

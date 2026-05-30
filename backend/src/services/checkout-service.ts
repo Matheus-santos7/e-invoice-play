@@ -1,3 +1,8 @@
+/**
+ * Checkout simplificado: valida produto/tenant e delega para `emitirCadeiaVenda`.
+ *
+ * Usado quando não há pedido rascunho (`pedido-service` faz o fluxo com rascunho).
+ */
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { PedidoCheckoutInput } from "../schemas/pedido-checkout.js";
 import { emitirCadeiaVenda, type PedidoForEmit, VendaChainError } from "./venda-chain-service.js";

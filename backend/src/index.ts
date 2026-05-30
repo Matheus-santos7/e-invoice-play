@@ -1,3 +1,9 @@
+/**
+ * Ponto de entrada da API Fastify (porta padrão 3001).
+ *
+ * Rotas sob `/api/*`. O frontend Next consome via `NEXT_PUBLIC_API_URL`.
+ * Prisma é injetado pelo plugin `plugins/prisma.ts`.
+ */
 import "dotenv/config";
 import cors from "@fastify/cors";
 import Fastify from "fastify";
@@ -9,6 +15,7 @@ import { lookupRoutes } from "./routes/lookup.js";
 import { tenantRoutes } from "./routes/tenants.js";
 import { productRoutes } from "./routes/products.js";
 import { pedidoRoutes } from "./routes/pedidos.js";
+import { unidadesLogisticasRoutes } from "./routes/unidades-logisticas.js";
 
 const app = Fastify({ logger: true });
 
@@ -21,6 +28,7 @@ await app.register(productRoutes, { prefix: "/api" });
 await app.register(pedidoRoutes, { prefix: "/api" });
 await app.register(fiscalRoutes, { prefix: "/api" });
 await app.register(fiscalSettingsRoutes, { prefix: "/api" });
+await app.register(unidadesLogisticasRoutes, { prefix: "/api" });
 
 const port = Number(process.env.PORT ?? 3001);
 const host = process.env.HOST ?? "0.0.0.0";
